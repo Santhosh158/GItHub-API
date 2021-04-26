@@ -1,0 +1,272 @@
+---
+title: "Assignment2-Rajamanickam-burtbeckwith"
+author: "Santhosh Babu Rajamanickam Natarajan"
+date: "01/04/2021"
+output: html_document
+---
+
+## Introduction
+### User 
+
+User Name: Burt Bectwith
+GitHub URL: https://github.com/burtbeckwith
+
+The user has joined the GitHub community in 2009 and made many contributions. He has a total of '492' public repositories and '324' followers. The user is located at Boston, MA
+
+### Load packages
+
+Loading `httr`,`gh` package for pulling the json from GitHub api 
+the `ggplot2` and `ggthemes` package for data visualization. `dplyr`,`tidyverse` is loaded for data wrangling.
+
+
+```{r load-packages, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(ggthemes)
+library(gh)
+library(httr)
+library(dplyr)
+library(kableExtra)
+my_token = "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"
+Sys.setenv(GITHUB_TOKEN=my_token)
+```
+
+### Importing data from GitHUb User API
+
+**URL:** "/users/burtbeckwith"
+Importing the Users data from the GitHub API using the 'gh' package
+
+```{r import-data}
+users <- gh("/users/burtbeckwith",.token = my_token)
+```
+
+Here, we have imported the data for the user details API. 
+
+## User Table
+
+In the following command, a table is created which summarizes the user's id,name,public_repos,followers
+
+```{r names}
+gitDF = jsonlite::fromJSON(jsonlite::toJSON(users))
+
+df <- data.frame(t(sapply(gitDF,c)))
+
+df_users <- df%>% select(id,name,public_repos,followers)
+knitr::kable(df_users)
+```
+
+### Importing the followers details for the user 'Burtbeckwith' as JSON from GItHub API
+**URL:** "/users/burtbeckwith/followers"
+
+We have imported the followers details as JSON, which is converted to a dataframe using the 'map_df' function from 'purr' package 
+
+```{r str,  message=FALSE, warning=FALSE}
+followers <- gh("/users/burtbeckwith/followers", .limit = Inf, .token = my_token)
+df_followers <- map_df(
+  followers, magrittr::extract, names(followers[[1]])
+)
+```
+
+## Followers Table
+* Extracting the url information for each of the followers and assigning them to a seperate variable 'followers_url' .
+* Then, an empty list is created for the variables name'id'public_repos and all the corresponding values are added to the list in a for loop. 
+* NA are added for empty spaces. 
+* The list is converted to a vector using 'unlist'. 
+* Finally, all these variables are grouped together to create a data frame.
+
+```{r}
+
+followers_url <- df_followers$url
+
+fol_name <- vector("list")
+fol_id <- vector("list")
+fol_public_repos <- vector("list")
+fol_followers <- vector("list")
+for (i in followers_url){
+  us <- gh(i,.token = my_token)
+  us$name[us$name == '(Null Value)'] <- NA
+  fol_name[[(length(fol_name) + 1)]] <- us$name
+  fol_id[[(length(fol_id) + 1)]] <- us$id
+  fol_public_repos[[(length(fol_public_repos) + 1)]] <- us$public_repos
+  fol_followers[[(length(fol_followers) + 1)]] <- us$followers
+}
+
+for(i in c(323,321,318,311,306,304,302,300,298,295,294,291,284,278,271,269,256,242,232,218,195,161,150,147,144,143,123,90,83,75,64,65,62,53,45,3)){
+  fol_name[[i]] <- NA
+}
+
+fol_id[sapply(fol_id, is.null)] <- NA
+fol_public_repos[sapply(fol_public_repos, is.null)] <- NA
+fol_followers[sapply(fol_followers, is.null)] <- NA
+
+fol_name_vec = unlist(fol_name)
+fol_id_vec = unlist(fol_id)
+fol_public_repos_vec = unlist(fol_public_repos)
+fol_followers_vec = unlist(fol_followers)
+
+df_us_followers = data.frame(
+  name = fol_name_vec, 
+  id = fol_id_vec,
+  public_repos = fol_public_repos_vec,
+  followers = fol_followers_vec
+  
+)
+knitr::kable(head(df_us_followers) )
+```
+
+### Importing the users repositories in JSON using the 'gh' package
+**URL:** "/users/burtbeckwith/repos"
+
+
+```{r pivot_longer, message=FALSE}
+repos <- gh("/users/burtbeckwith/repos", .limit = Inf, .token = my_token)
+
+```
+
+## Repositories table
+
+* Here, we are creating a vector for every variables using the 'map_chr' for character and 'map_dbl' for numeric values. 
+* For the language_vec variable, 'map_chr; throws error due the the presence of NULL values, hence 'map' is used which outputs a list.
+* Then, NA's are added in places of 'NULL'   values as 'NULL' values will be dropped during 'unlist' operation.
+* Finally, all the vectors are grouped together to create a data frame.
+
+```{r Subset of data}
+
+#name
+name_vec = map_chr(repos, function(x) {
+  (x$name)
+})
+#language
+language_vec = map(repos, function(x) {
+  (x$language)
+})
+
+language_vec[sapply(language_vec, is.null)] <- NA
+language_vector = unlist(language_vec) # unlist converts list to vector but drops null values hence null is converted to NA in previous step
+#b <- (as.character(language_vec))
+#size
+size_vec = map_dbl(repos, function(x) {
+  as.numeric(x$size)
+})
+#forks_count
+forks_count_vec = map_dbl(repos, function(x) {
+  as.numeric(x$forks_count)
+})
+#stargazers_count
+stargazers_count_vec = map_dbl(repos, function(x) {
+  as.numeric(x$stargazers_count)
+})
+#watchers_count
+watchers_count_vec = map_dbl(repos, function(x) {
+  as.numeric(x$watchers_count)
+})
+#open_issues_count
+open_issues_count_vec = map_dbl(repos, function(x) {
+  as.numeric(x$open_issues_count)
+})
+
+df_repos = data.frame(
+  name = name_vec, 
+  language = language_vector,
+  size = size_vec,
+  forks_count = forks_count_vec,
+  stargazers_count = stargazers_count_vec,
+  watchers_count = watchers_count_vec,
+  open_issues_count = open_issues_count_vec
+  
+)
+knitr::kable(head(df_repos))
+```
+
+
+## Issues Table
+### Importing the issues for every repository of the user
+* Open_issues_count has been imported from the repositories table.
+* Closed_issues_count is pulled for each repo with the state='closed' argument and the number of such issues is calculated by its length.
+* The vectors are created for the required variables
+* Finally, all the variables are grouped together to form a data frame.
+
+```{r}
+
+repos_name <- df_repos$name
+
+issue_close <- vector("list")
+avg_duration <- vector("list")
+
+for (i in repos_name){
+  is <- gh(paste("/repos/burtbeckwith/",i,"/issues",sep=""),.token = my_token, state="closed")
+  issue_close[[(length(issue_close) + 1)]] <- length(is)
+  duraton <- 0
+  
+  duration <- map_dbl(is, function(X)
+  {
+    duration_minutes <- difftime(X$closed_at, 
+                                 X$created_at, units = "mins")
+    duration_minutes
+  })
+  
+  avg_duration_minutes <- mean(duration, na.rm = TRUE)
+  avg_duration_days <- avg_duration_minutes/(60*24)
+  avg_duration[[(length(avg_duration) + 1)]] <- avg_duration_days
+}
+
+repos_name <- df_repos$name
+open_issue_vec <- df_repos$open_issues_count
+closed_is_vec = unlist(issue_close)
+avg_duration[sapply(avg_duration, is.nan)] <- 0
+avg_duration_vec = unlist(avg_duration) 
+
+df_issues = data.frame(
+  name = repos_name, 
+  Number_open_issues = open_issue_vec,
+  Number_closed_isssues = closed_is_vec,
+  Avg_duration = avg_duration_vec
+  
+)
+knitr::kable(head(df_issues))
+```
+
+
+## Visualization
+
+
+* In the first graph, the issues table data is used, 'Number_open_isses' and 'Number_closed_isssues are plotted against the x and y axis.A new variable is added to the table which gives the info on the Avg_duration showing if the time differnce is high or low based on the number of days elapsed. 
+* The data frame is filtered to have values with 'Number_open_issues' > 0 and 'Number_closed_isssues'> 0 
+* Facet_wrap' function is used for the Time variable 
+
+```{r Plot 1, fig.height = 5, fig.width = 13}
+df_issues = df_issues %>%
+  mutate(Time = ifelse(Avg_duration <= 10 , "Low", "High"))
+plot1_df <- df_issues %>% filter(Number_open_issues > 0 & Number_closed_isssues > 0)
+ggplot(data = plot1_df,aes(x = Number_open_issues , y= Number_closed_isssues , color = name)) +
+  geom_point() +
+  facet_wrap(~Time,nrow = 2) +
+  theme_fivethirtyeight()
+```
+
+### From this graph, we can infer the below
+
+  * Many repositories seem to have consumed more time for the issues to be moved to closed state.
+  * The repositories which have more closed issues and more open issues seem to have high time duration. But there do exists few repositories which has got very less number of open and closed issues but the time duration stands high. It can be attributed to the complexity or the language of the repository which will be analyzed in the next graph.
+  
+
+In the second graph, the 'Repository' table of the user is used to plot the second graph. A new variable 'watchers_ratio' is added to the repos table which signifies if the watchers count is high or low. The data is filtered to have values with 'open_issues_count' greater than 0. 'language' is plotted on the x axis and the 'open_issues_count' is plotted on the y axix. 'Facet_wrap' function is used for the 'watchers_count' and 'size' of the repository is plotted against the 'color' attribute
+
+```{r Plot 2, fig.height = 5, fig.width = 10}
+
+df_repos = df_repos %>%
+  mutate(Watchers_ratio = ifelse(watchers_count <= 10 , "Low Watchers", "High Watchers"))
+plot2_df <- df_repos %>% filter(open_issues_count > 0)
+ggplot(data = plot2_df,aes(x = language , y= open_issues_count , color = size)) +
+  geom_point() +
+  facet_wrap(~Watchers_ratio,nrow = 2) +
+  theme_foundation() +
+  scale_color_continuous()
+```
+
+### From the above graph, we can infer the following,
+
+* The user seem to have many repositories that has the language 'Groovy'
+* We can see that there exists multiple repositories with many open_issues, but the highest 'open_issues_count' can be seen for the 'Javascript' language. We can also see that it falls under the 'Low Watchers' category. So we can see that there is a direct correlation between the 'watchers_count' and the 'open_issues_count'. 
+* Low_watchers count for 'Javascript' reflects that less number of people are actually that topic and hence the number of open_isses remain high.
+* The language 'CoffeeScript' has 'High Watchers' and hence we can see that the many people are actually looking into repository which directly reflects in the number of open_issues_count being very low for that category
